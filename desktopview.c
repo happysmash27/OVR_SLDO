@@ -29,6 +29,7 @@ void print_screen_info(xcb_connection_t *xcb_connection, int *screen_number){
 
   printf("Screen number: %d\n", *screen_number);
 
+  //XCB example does some weird thing to get to screen number 0. Look into this to improve this later, but as this likely isn't very important, I will leave this as is for now. 
   screen_iterator = xcb_setup_roots_iterator(xcb_get_setup(xcb_connection));
   xcb_screen = screen_iterator.data;
 
