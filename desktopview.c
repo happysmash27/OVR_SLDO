@@ -42,8 +42,6 @@ uint8_t *grab_X11_drawable(xcb_drawable_t drawable) {
 int main (int argc, char **argv){
   ovr_sldo_context_t *ovr_sldo = init();
 
-  //Just printing the screen info as a test to make sure my Great Variable Shift works
-  print_screen_info(ovr_sldo->xcb_context);
   //What I actually want to do -- try to get an image of my screen, as a test
   print_root_window_test(ovr_sldo->xcb_context);
 
