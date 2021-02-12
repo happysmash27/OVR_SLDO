@@ -120,10 +120,6 @@ void print_root_window_test(xcb_context_t *xcb_context){
   //Just going to print to stdout for now, ppm format
   //Hardcode 255, because this is a test function, and I don't feel like making it dynamic. It should be dynamic in the actual implementation
   fprintf(stdout, "P3\n%d %d 255\n", framebuffer1->width, framebuffer1->height);
-
-  int test = framebuffer1->data[3];
-  printf("Test: %d\n", test);
-  sleep(1);
   
   for (int i=0; i < framebuffer1->size; i+=3){
     fprintf(stdout, "%hhd %hhd, %hhd\n", framebuffer1->data[i], framebuffer1->data[i+1], framebuffer1->data[i+2]);
