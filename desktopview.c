@@ -122,7 +122,7 @@ void print_root_window_test(xcb_context_t *xcb_context){
   fprintf(stdout, "P3\n%d %d 255\n", framebuffer1->width, framebuffer1->height);
   
   for (int i=0; i < framebuffer1->size; i+=4){
-    fprintf(stdout, "%hhu %hhu, %hhu, %hhu\n", framebuffer1->data[i], framebuffer1->data[i+1], framebuffer1->data[i+2], framebuffer1->data[i+3]);
+    fprintf(stdout, "%hhu %hhu, %hhu\n", framebuffer1->data[i], framebuffer1->data[i+1], framebuffer1->data[i+2]);
   }
 
   //We are done. Close everything.
