@@ -69,7 +69,7 @@ void print_root_window_test(xcb_context_t *xcb_context){
   framebuffer1->width = xcb_screen->width_in_pixels;
   framebuffer1->height = xcb_screen->height_in_pixels;
   //May as well store this statically, since it is a small amount of data for not running this instruction every time
-  framebuffer1->size = (framebuffer1->width)*(framebuffer1->height)*3;
+  framebuffer1->size = (framebuffer1->width)*(framebuffer1->height)*4;
 
   //Allocate a shared memory buffer. 
   //0666 means permission to read and write by the user, the group, and others. Not quite sure how group and others applies to a process... but may as well try to enable everything so it works. Well, other than execute, which shouldn't affect anything. 
@@ -88,7 +88,7 @@ void print_root_window_test(xcb_context_t *xcb_context){
 
   //Now we fill them.
   //I'm not sure what the differences are between the xcb_image_format_ts are, as yet again, I can find nothing online! Such horrible documentation! Anyways, I will do what ffmpeg does, using XCB_IMAGE_FORMAT_Z_PIXMAP, then see what happens if I use XCB_IMAGE_FORMAT_XY_PIXMAP instead, since that also sounds like something I would want
-  image_request = xcb_shm_get_image(xcb_context->connection, xcb_screen->root, 0, 0, framebuffer1->width, framebuffer1->height, ~0, XCB_IMAGE_FORMAT_XY_PIXMAP , shm_segment, 0);
+  image_request = xcb_shm_get_image(xcb_context->connection, xcb_screen->root, 0, 0, framebuffer1->width, framebuffer1->height, ~0, XCB_IMAGE_FORMAT_Z_PIXMAP , shm_segment, 0);
 
   //And now we immediately request it back. I think this causes it to wait until it has been gathered?
   //Try not to do error handling now, but if the null causes problems, I might have to add it to this early testing function
@@ -121,8 +121,8 @@ void print_root_window_test(xcb_context_t *xcb_context){
   //Hardcode 255, because this is a test function, and I don't feel like making it dynamic. It should be dynamic in the actual implementation
   fprintf(stdout, "P3\n%d %d 255\n", framebuffer1->width, framebuffer1->height);
   
-  for (int i=0; i < framebuffer1->size; i+=3){
-    fprintf(stdout, "%hhu %hhu, %hhu\n", framebuffer1->data[i], framebuffer1->data[i+1], framebuffer1->data[i+2]);
+  for (int i=0; i < framebuffer1->size; i+=4){
+    fprintf(stdout, "%hhu %hhu, %hhu\n", framebuffer1->data[i+2], framebuffer1->data[i+1], framebuffer1->data[i]);
   }
 
   //We are done. Close everything.
