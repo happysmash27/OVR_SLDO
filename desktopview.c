@@ -162,4 +162,6 @@ ovr_sldo_context_t *init(){
 
 void deinit(ovr_sldo_context_t *ovr_sldo){
   xcb_disconnect(ovr_sldo->xcb_context->connection);
+  free(ovr_sldo->xcb_context);
+  free(ovr_sldo);
 }
