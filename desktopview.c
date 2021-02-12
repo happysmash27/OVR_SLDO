@@ -98,12 +98,12 @@ void print_root_window_test(xcb_context_t *xcb_context){
     fprintf(stderr, "Error getting image reply!\n"
 	    "\n"
 	    "Response type %u\n"
-	    "Error code %u\n"
+	    "Error code %u: %s\n"
 	    "Sequence number %u\n"
 	    "Resource ID %u\n"
-	    "Minor opcode %u\n"
-	    "Major opcode %u\n"
-	    "\n", e->response_type, e->error_code, e->sequence, e->resource_id, e->minor_code, e->major_code);
+	    "Major opcode %u: %s\n"
+	    "Minor opcode %u: %s\n"
+	    "\n", e->response_type, e->error_code, xcb_errors_get_name_for_error(xcb_context->errors_context, e->error_code, NULL), e->sequence, e->resource_id, e->major_code, xcb_errors_get_name_for_major_code(xcb_context->errors_context, e->major_code), e->minor_code, xcb_errors_get_name_for_minor_code(xcb_context->errors_context, e->major_code, e->minor_code));
   }
 
   //Flush things, just to be sure
