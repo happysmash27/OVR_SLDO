@@ -69,7 +69,7 @@ void print_root_window_test(xcb_context_t *xcb_context){
   framebuffer1->width = xcb_screen->width_in_pixels;
   framebuffer1->height = xcb_screen->height_in_pixels;
   //May as well store this statically, since it is a small amount of data for not running this instruction every time
-  framebuffer1->size = (framebuffer1->width)*(framebuffer1->height)*3;
+  framebuffer1->size = (framebuffer1->width)*(framebuffer1->height)*4;
 
   //Allocate a shared memory buffer. 
   //0666 means permission to read and write by the user, the group, and others. Not quite sure how group and others applies to a process... but may as well try to enable everything so it works. Well, other than execute, which shouldn't affect anything. 
