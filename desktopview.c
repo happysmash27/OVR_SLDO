@@ -24,6 +24,8 @@ typedef struct xcb_context_t {
 
 typedef struct ovr_sldo_context_t {
   xcb_context_t *xcb_context;
+  int framebuffer_readfrom;
+  shm_framebuffer_t framebuffer[2];
 } ovr_sldo_context_t;
 
 ovr_sldo_context_t *init();
@@ -161,6 +163,7 @@ ovr_sldo_context_t *init(){
 }
 
 void deinit(ovr_sldo_context_t *ovr_sldo){
+  xcb_errors_context_free(ovr_sldo->xcb_context->errors_context);
   xcb_disconnect(ovr_sldo->xcb_context->connection);
   free(ovr_sldo->xcb_context);
   free(ovr_sldo);
