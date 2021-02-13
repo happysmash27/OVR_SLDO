@@ -98,10 +98,30 @@ int main (int argc, char **argv){
   
   ovr_sldo_context_t *ovr_sldo = init();
 
+  
+  //To see if we are fast enough, we will create variables for our start time and end time to time our function
+  struct timespec start_time, end_time;
+  //Capture our start time
+  clock_gettime(CLOCK_REALTIME, &start_time);
+  
   //Write our framebuffer
   if (update_framebuffer_with_root(ovr_sldo->xcb_context, &(ovr_sldo->framebuffer[0]))){
     exit_code = EXIT_FAILURE;
   }
+
+  //Now capture our end time and calculate our time ellapsed in milliseconds
+  //Capture end time ASAP
+  clock_gettime(CLOCK_REALTIME, &end_time);
+  //Now we have time to convert our variables to long ints of milliseconds. 
+  long long int start_time_ms, end_time_ms, ellapsed_time_ms;
+  start_time_ms = start_time.tv_sec*1000 + start_time.tv_nsec/1000000;
+  end_time_ms = end_time.tv_sec*1000 + end_time.tv_nsec/1000000;
+  //And calculate the difference in time into one easy-to-print variable that won't print our seconds if it is not needed (and it shouldn't be needed, as this capture is supposed to take 16 ms at max)
+  ellapsed_time_ms = end_time_ms-start_time_ms;
+  //Print our time ellapsed
+  fprintf(stderr, "Capture time: %lld ms\n", ellapsed_time_ms);
+
+  
 
   //Read our framebuffer
   write_image_BGRA_ppm(&(ovr_sldo->framebuffer[0]));
