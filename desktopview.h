@@ -2,6 +2,12 @@
 #include <xcb/shm.h>
 #include <xcb/xcb_errors.h>
 
+typedef struct shm_subbuf_t {
+  signed char lock;
+  uint32_t id;
+  unsigned char *addr;
+} shm_subbuf_t;
+
 typedef struct shm_framebuffer_t {
   int width;
   int height;
@@ -9,11 +15,7 @@ typedef struct shm_framebuffer_t {
   //Here we have the number of buffers for a single window
   unsigned char number_of_buffers;
   unsigned char read_this_buffer;
-  struct *data {
-    signed char lock;
-    uint32_t id;
-    unsigned char *addr;
-  };
+  shm_subbuf_t *data;
 } shm_framebuffer_t;
 
 typedef struct xcb_context_t {
