@@ -195,15 +195,18 @@ void deinit(ovr_sldo_context_t *ovr_sldo){
   xcb_disconnect(ovr_sldo->xcb_context->connection);
   free(ovr_sldo->xcb_context);
 
-  //Free framebuffers
+  //Free framebuffers and shm segments
   int i, j;
   for (i=0; i < ovr_sldo->number_of_buffers; i++){
+    free(ovr_sldo->xcb_context->shm_segment[i]);
+    fprintf(stderr, "Freed shm_segment[%d]\n", i);
     for (j=0; j < ovr_sldo->framebuffer[i].number_of_buffers; j++){
       shmdt(ovr_sldo->framebuffer[i].data[j].addr);
     }
     free(ovr_sldo->framebuffer[i].data);
     free(ovr_sldo->framebuffer);
   }
+  free(ovr_sldo->xcb_context->shm_segment);
 
   //Free our main context struct
   free(ovr_sldo);

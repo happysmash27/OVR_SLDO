@@ -22,7 +22,7 @@ typedef struct xcb_context_t {
   xcb_connection_t *connection;
   int screen_number;
   xcb_screen_iterator_t scrn_itr;
-  //Array of shm segments, that for now, will match the number of shm_framebuffer_t and number of framebuffers inside each
+  //Array of arrays of shm segments, that for now, will match the number of shm_framebuffer_t and number of framebuffers inside each
   xcb_shm_seg_t **shm_segment;
   xcb_errors_context_t *errors_context;
 } xcb_context_t;
