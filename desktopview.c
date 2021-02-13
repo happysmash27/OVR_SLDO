@@ -69,6 +69,9 @@ int update_framebuffer_with_root(xcb_context_t *xcb_context, shm_framebuffer_t *
 	    "Minor opcode %u: %s\n"
 	    "\n", e->response_type, e->error_code, xcb_errors_get_name_for_error(xcb_context->errors_context, e->error_code, NULL), e->sequence, e->resource_id, e->major_code, xcb_errors_get_name_for_major_code(xcb_context->errors_context, e->major_code), e->minor_code, xcb_errors_get_name_for_minor_code(xcb_context->errors_context, e->major_code, e->minor_code));
   }
+
+  //This needs to be freed at the end
+  free(image_reply);
   
   //Remove our lock, tell our program to read the freshest structure, and exit
   framebuffer->data[write_this_buffer].lock = 0;
