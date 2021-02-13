@@ -53,8 +53,25 @@ int update_framebuffer_with_root(xcb_context_t *xcb_context, shm_framebuffer_t *
   //Use XCB_IMAGE_FORMAT_Z_PIXMAP, as I am not yet sure how to read XCB_IMAGE_FORMAT_XY_PIXMAP due to lack of examples
   //Currently only use 0 on screen_itr. This should be changed to support multiple screens in the future
   image_request = xcb_shm_get_image(xcb_context->connection, xcb_context->scrn_itr.data->root, 0, 0, framebuffer->width, framebuffer->height, ~0, XCB_IMAGE_FORMAT_Z_PIXMAP, xcb_context->shm_segment[0][write_this_buffer], 0);
+
+   //To see if libXCB is fast enough, we will create variables for the start and end time of requesting an image
+  struct timespec start_time, end_time;
+  //Capture our start time
+  clock_gettime(CLOCK_REALTIME, &start_time);
   //Immediately request a reply, so we wait until the framebuffer has been filled
   image_reply = xcb_shm_get_image_reply(xcb_context->connection, image_request, &e);
+
+  //Now capture the end time of the request and calculate the time ellapsed in milliseconds
+  //Capture end time
+  clock_gettime(CLOCK_REALTIME, &end_time);
+  //Now we have time to convert our variables to long ints of milliseconds. 
+  long long int start_time_ms, end_time_ms, ellapsed_time_ms;
+  start_time_ms = start_time.tv_sec*1000 + start_time.tv_nsec/1000000;
+  end_time_ms = end_time.tv_sec*1000 + end_time.tv_nsec/1000000;
+  //And calculate the difference in time into one easy-to-print variable that won't print our seconds if it is not needed (and it shouldn't be needed, as this capture is supposed to take 16 ms at max)
+  ellapsed_time_ms = end_time_ms-start_time_ms;
+  //Print the time ellapsed
+  fprintf(stderr, "XCB wait time: %lld ms\n", ellapsed_time_ms);
 
   //Error handling, including very vague messages about what went wrong
   //I used this to figure out that 3 bytes per pixel wasn't enough. Maybe it will also be useful in the future
