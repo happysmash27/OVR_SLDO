@@ -149,7 +149,7 @@ ovr_sldo_context_t *init(){
   						 sizeof(xcb_shm_seg_t*));
   //Initialise the array itself
   ovr_sldo->xcb_context->shm_segment[0] = calloc((size_t) ovr_sldo->framebuffer[0].number_of_buffers,
-  						 sizeof(xcb_shm_seg_t*));
+  						 sizeof(xcb_shm_seg_t));
 
   //Initialise our iterator for screen data
   ovr_sldo->xcb_context->scrn_itr = xcb_setup_roots_iterator(xcb_get_setup(ovr_sldo->xcb_context->connection));
@@ -190,16 +190,10 @@ ovr_sldo_context_t *init(){
 }
 
 void deinit(ovr_sldo_context_t *ovr_sldo){
-  //Free XCB context
-  xcb_errors_context_free(ovr_sldo->xcb_context->errors_context);
-  xcb_disconnect(ovr_sldo->xcb_context->connection);
-  free(ovr_sldo->xcb_context);
-
   //Free framebuffers and shm segments
   int i, j;
   for (i=0; i < ovr_sldo->number_of_buffers; i++){
     free(ovr_sldo->xcb_context->shm_segment[i]);
-    fprintf(stderr, "Freed shm_segment[%d]\n", i);
     for (j=0; j < ovr_sldo->framebuffer[i].number_of_buffers; j++){
       shmdt(ovr_sldo->framebuffer[i].data[j].addr);
     }
@@ -207,6 +201,11 @@ void deinit(ovr_sldo_context_t *ovr_sldo){
     free(ovr_sldo->framebuffer);
   }
   free(ovr_sldo->xcb_context->shm_segment);
+
+  //Free XCB context
+  xcb_errors_context_free(ovr_sldo->xcb_context->errors_context);
+  xcb_disconnect(ovr_sldo->xcb_context->connection);
+  free(ovr_sldo->xcb_context);
 
   //Free our main context struct
   free(ovr_sldo);
