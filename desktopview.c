@@ -13,6 +13,8 @@
 //
 //void new_framebuffer_for_X11_drawable(ovr_sldo_context_t *ovr_sldo, xcb_drawable_t drawable);
 
+void shm_subbuf_add(shm_framebuffer_t *framebuffer);
+
 ovr_sldo_context_t *init();
 
 void deinit(ovr_sldo_context_t *ovr_sldo);
@@ -36,11 +38,11 @@ void *update_framebuffer_with_root(void *args){
 
   //Find which buffer to write to. It must not be the one pointed to for the next read, nor being written to or read from
   int write_this_buffer;
-  for (write_this_buffer=0; write_this_buffer<framebuffer->number_of_buffers; write_this_buffer++){
-    if ((write_this_buffer == framebuffer->read_this_buffer) || (framebuffer->data[write_this_buffer].lock)){
+  for (write_this_buffer=0; write_this_buffer<framebuffer->number_of_subbufs; write_this_buffer++){
+    if ((write_this_buffer == framebuffer->read_this_buffer) || (framebuffer->subbuf[write_this_buffer].lock)){
       continue;
     } else {
-      framebuffer->data[write_this_buffer].lock = 1;
+      framebuffer->subbuf[write_this_buffer].lock = 1;
       break;
     }
   }
@@ -56,7 +58,7 @@ void *update_framebuffer_with_root(void *args){
   //Now request our image to fill the framebuffer
   //Use XCB_IMAGE_FORMAT_Z_PIXMAP, as I am not yet sure how to read XCB_IMAGE_FORMAT_XY_PIXMAP due to lack of examples
   //Currently only use 0 on screen_itr. This should be changed to support multiple screens in the future
-  image_request = xcb_shm_get_image(xcb_context->connection, xcb_context->scrn_itr.data->root, 0, 0, framebuffer->width, framebuffer->height, ~0, XCB_IMAGE_FORMAT_Z_PIXMAP, xcb_context->shm_segment[0][write_this_buffer], 0);
+  image_request = xcb_shm_get_image(xcb_context->connection, xcb_context->scrn_itr.data->root, 0, 0, framebuffer->width, framebuffer->height, ~0, XCB_IMAGE_FORMAT_Z_PIXMAP, xcb_context->shm_segment[framebuffer->bufnum][write_this_buffer], 0);
 
    //To see if libXCB is fast enough, we will create variables for the start and end time of requesting an image
   struct timespec start_time, end_time;
@@ -96,7 +98,7 @@ void *update_framebuffer_with_root(void *args){
   free(image_reply);
   
   //Remove our lock, tell our program to read the freshest structure, and exit
-  framebuffer->data[write_this_buffer].lock = 0;
+  framebuffer->subbuf[write_this_buffer].lock = 0;
   framebuffer->read_this_buffer = write_this_buffer;
   pthread_exit(&exit_code);  
 }
@@ -108,9 +110,9 @@ void write_image_BGRA_ppm(shm_framebuffer_t *framebuffer){
   
   for (int i=0; i < framebuffer->size; i+=4){
     fprintf(stdout, "%hhu %hhu, %hhu\n",
-	    framebuffer->data[framebuffer->read_this_buffer].addr[i+2],
-	    framebuffer->data[framebuffer->read_this_buffer].addr[i+1],
-	    framebuffer->data[framebuffer->read_this_buffer].addr[i]);
+	    framebuffer->subbuf[framebuffer->read_this_buffer].addr[i+2],
+	    framebuffer->subbuf[framebuffer->read_this_buffer].addr[i+1],
+	    framebuffer->subbuf[framebuffer->read_this_buffer].addr[i]);
   }
   
 }
@@ -208,14 +210,16 @@ ovr_sldo_context_t *init(){
 
   //Initialise the framebuffer struct
   ovr_sldo->framebuffer = calloc(1, sizeof (shm_framebuffer_t));
-  //We have 3 framebuffers, so that if we finish writing to a fresh framebuffer but another thread is reading from an old one, we can write to a third framebuffer so that when this reading is done, the other thread can immediately read the fresh one we just wrote instead of waiting for us to write it again
-  ovr_sldo->framebuffer[0].number_of_buffers = 9;
+  //This is the 0th framebuffer struct, as we only have 1 of them
+  ovr_sldo->framebuffer->bufnum = 0;
+  //We start with 0 subbuffers
+  ovr_sldo->framebuffer[0].number_of_subbufs = 0;
 
-  //Also initialise out single pointer to an array of shm segments (for framebuffer[0]->data
+  //Also initialise our single pointer to an array of shm segments (for framebuffer[0]->subbuf)
   ovr_sldo->xcb_context->shm_segment = calloc((size_t) ovr_sldo->number_of_buffers,
   						 sizeof(xcb_shm_seg_t*));
   //Initialise the array itself
-  ovr_sldo->xcb_context->shm_segment[0] = calloc((size_t) ovr_sldo->framebuffer[0].number_of_buffers,
+  ovr_sldo->xcb_context->shm_segment[0] = calloc((size_t) ovr_sldo->framebuffer[0].number_of_subbufs,
   						 sizeof(xcb_shm_seg_t));
 
   //Initialise our iterator for screen data
@@ -229,25 +233,11 @@ ovr_sldo_context_t *init(){
   //Initialise the framebuffers with our shared memory ID, shared memory address, and lock indicator
   //The memory allocation should be dynamically generated in the runtime fubnction eventually to allow it to change size, but as I am still unclear on how to re-allocate shared memory, for now I will do it here.
   //First generate an array of sub-buffers. We use this, rather than an array of pointers, so we don't keep looking up pointers so much... And because I realised that's what my datatype suggests, so I may as well go with that accidental extra efficiency. We won't be adding extra framebuffers to our 3 too often, so we don't really need to make it faster.
-  ovr_sldo->framebuffer[0].data = calloc((size_t) ovr_sldo->framebuffer[0].number_of_buffers,
+  ovr_sldo->framebuffer[0].subbuf = calloc((size_t) ovr_sldo->framebuffer[0].number_of_subbufs,
 					 sizeof(shm_subbuf_t));
   //Do our loop of initialisation! 
-  for (int i=0; i < ovr_sldo->framebuffer[0].number_of_buffers; i++){
-    //Request shared memory, and store the ID
-    //0666 means permission to read and write by the user, the group, and others. Not quite sure how group and others applies to a process... but may as well try to enable everything so it works. Well, other than execute, which shouldn't affect anything. 
-    ovr_sldo->framebuffer[0].data[i].id = shmget(IPC_PRIVATE, ovr_sldo->framebuffer[0].size, IPC_CREAT | 0666);
-    //Get the address of our shared memory
-    //Not using SHM_RDONLY for the last option, just in case. Might change this in the future
-    ovr_sldo->framebuffer[0].data[i].addr = (unsigned char *) shmat(ovr_sldo->framebuffer[0].data[i].id, NULL, 0);
-    //Initialise the lock on this shared memory as unlocked
-    ovr_sldo->framebuffer[0].data[i].lock = 0;
-
-    //Create XCB SHM segment for getting out data from XCB via SHM, initialise it, and attach it to our array
-    ovr_sldo->xcb_context->shm_segment[0][i] = xcb_generate_id(ovr_sldo->xcb_context->connection);
-    
-    xcb_shm_attach(ovr_sldo->xcb_context->connection,
-		   ovr_sldo->xcb_context->shm_segment[0][i],
-		   ovr_sldo->framebuffer[0].data[i].id, 0);
+  for (int i=0; i < INITIAL_BUFNUM; i++){
+    shm_subbuf_add(&(ovr_sldo->framebuffer[0]));
   }
   
   //Initialising this to the second buffer so our capture function uses the first one first
@@ -256,15 +246,52 @@ ovr_sldo_context_t *init(){
   return ovr_sldo;
 }
 
+//Plan: Make subbuffer initialisation function
+//Use it for our init
+//Then, increase our subbuffer number whenever we run out.
+//I guess we will be doing it a few times after all (referring to me thinking it wouldn't happen to often), but at least it should only happen at the start
+//Also, make sure I am freeing the shared memory
+
+//Initialises an additional subbuffer for a window
+void shm_subbuf_add(shm_framebuffer_t *framebuffer){
+  //Reallocate our array
+  framebuffer->subbuf = reallocarray(framebuffer->subbuf, (size_t) framebuffer->number_of_subbufs+1,
+				     sizeof(shm_subbuf_t));
+  //Reallocate shm segments too
+  xcb_context->shm_segment[framebuffer->bufnum] = reallocarray(xcb_context->shm_segment[framebuffer->bufnum],
+							       (size_t) framebuffer->number_of_subbufs+1,
+							       sizeof(xcb_shm_seg_t));
+  
+  //Request shared memory, and store the ID
+  //0666 means permission to read and write by the user, the group, and others. Not quite sure how group and others applies to a process... but may as well try to enable everything so it works. Well, other than execute, which shouldn't affect anything. 
+  framebuffer->subbuf[framebuffer->number_of_subbufs].id = shmget(IPC_PRIVATE, framebuffer->size, IPC_CREAT | 0666);
+  //Get the address of our shared memory
+  //Not using SHM_RDONLY for the last option, just in case. Might change this in the future
+  framebuffer->subbuf[framebuffer->number_of_subbufs].addr = (unsigned char *) shmat(framebuffer->subbuf[framebuffer->number_of_subbufs].id, NULL, 0);
+  //Make sure shared memory is freed when we exit
+  shmctl(framebuffer->subbuf[framebuffer->number_of_subbufs].id, IPC_RMID, 0);
+  //Initialise the lock on this shared memory as unlocked
+  framebuffer->subbuf[framebuffer->number_of_subbufs].lock = 0;
+
+  //Create XCB SHM segment for getting out data from XCB via SHM, initialise it, and attach it to our array
+  xcb_context->shm_segment[framebuffer->bufnum][framebuffer->number_of_subbufs] = xcb_generate_id(xcb_context->connection);
+    
+  xcb_shm_attach(xcb_context->connection,
+		 xcb_context->shm_segment[framebuffer->bufnum][framebuffer->number_of_subbufs],
+		 framebuffer[0].subbuf[framebuffer->number_of_subbufs].id, 0);
+
+  framebuffer->number_of_subbufs += 1;
+}
+
 void deinit(ovr_sldo_context_t *ovr_sldo){
   //Free framebuffers and shm segments
   int i, j;
   for (i=0; i < ovr_sldo->number_of_buffers; i++){
     free(ovr_sldo->xcb_context->shm_segment[i]);
-    for (j=0; j < ovr_sldo->framebuffer[i].number_of_buffers; j++){
-      shmdt(ovr_sldo->framebuffer[i].data[j].addr);
+    for (j=0; j < ovr_sldo->framebuffer[i].number_of_subbufs; j++){
+      shmdt(ovr_sldo->framebuffer[i].subbuf[j].addr);
     }
-    free(ovr_sldo->framebuffer[i].data);
+    free(ovr_sldo->framebuffer[i].subbuf);
     free(ovr_sldo->framebuffer);
   }
   free(ovr_sldo->xcb_context->shm_segment);
