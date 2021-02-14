@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include "desktopview.h"
@@ -28,7 +29,10 @@ void print_screen_info(xcb_context_t *xcb_context);
 }*/
 
 //Instead, I will use this one that only grabs the root window
-int update_framebuffer_with_root(xcb_context_t *xcb_context, shm_framebuffer_t *framebuffer){
+void *update_framebuffer_with_root(void *args){
+  shm_framebuffer_t *framebuffer = (shm_framebuffer_t *) args;
+  
+  int exit_code = EXIT_SUCCESS;
 
   //Find which buffer to write to. It must not be the one pointed to for the next read, nor being written to or read from
   int write_this_buffer;
@@ -85,6 +89,7 @@ int update_framebuffer_with_root(xcb_context_t *xcb_context, shm_framebuffer_t *
 	    "Major opcode %u: %s\n"
 	    "Minor opcode %u: %s\n"
 	    "\n", e->response_type, e->error_code, xcb_errors_get_name_for_error(xcb_context->errors_context, e->error_code, NULL), e->sequence, e->resource_id, e->major_code, xcb_errors_get_name_for_major_code(xcb_context->errors_context, e->major_code), e->minor_code, xcb_errors_get_name_for_minor_code(xcb_context->errors_context, e->major_code, e->minor_code));
+    exit_code = EXIT_FAILURE;
   }
 
   //This needs to be freed at the end
@@ -93,7 +98,7 @@ int update_framebuffer_with_root(xcb_context_t *xcb_context, shm_framebuffer_t *
   //Remove our lock, tell our program to read the freshest structure, and exit
   framebuffer->data[write_this_buffer].lock = 0;
   framebuffer->read_this_buffer = write_this_buffer;
-  return EXIT_SUCCESS;  
+  pthread_exit(&exit_code);  
 }
 
 void write_image_BGRA_ppm(shm_framebuffer_t *framebuffer){
@@ -112,6 +117,7 @@ void write_image_BGRA_ppm(shm_framebuffer_t *framebuffer){
 
 int main (int argc, char **argv){
   int exit_code = EXIT_SUCCESS;
+  void *thread_retval_ptr;
   
   ovr_sldo_context_t *ovr_sldo = init();
 
@@ -120,9 +126,30 @@ int main (int argc, char **argv){
   struct timespec start_time, end_time;
   //Capture our start time
   clock_gettime(CLOCK_REALTIME, &start_time);
+
+  //Create threads to write our framebuffer twice, to see if our problem is speed or latency
+  ovr_sldo->num_threads = 60;
+  ovr_sldo->threads = calloc(ovr_sldo->num_threads, sizeof(pthread_t));
   
-  //Write our framebuffer
-  if (update_framebuffer_with_root(ovr_sldo->xcb_context, &(ovr_sldo->framebuffer[0]))){
+  //Capture ovr_sldo->num_threads frames for our speed vs latency testing
+  for (int i=0; i<ovr_sldo->num_threads; i++){
+    if (pthread_create(&(ovr_sldo->threads[i]), NULL,
+		       update_framebuffer_with_root,
+		       &(ovr_sldo->framebuffer[0]))){
+      fprintf(stderr, "Error creating thread %d!\n", i);
+      exit_code = EXIT_FAILURE;
+    }
+    //Wait 16 ms for next frame
+    usleep(16*1000);
+  }
+
+  //Wait for our last thread to exit
+  if(pthread_join(ovr_sldo->threads[ovr_sldo->num_threads-1], &thread_retval_ptr)){
+    fprintf(stderr, "Error joining thread!\n");
+    exit_code = EXIT_FAILURE;
+  }
+  if (*((int*)thread_retval_ptr)){
+    fprintf(stderr, "Image failed to capture!\n");
     exit_code = EXIT_FAILURE;
   }
 
@@ -138,7 +165,8 @@ int main (int argc, char **argv){
   //Print our time ellapsed
   fprintf(stderr, "Capture time: %lld ms\n", ellapsed_time_ms);
 
-  
+  //Sleep to make sure we have enough time to get a full frame
+  usleep(40*1000);
 
   //Read our framebuffer
   write_image_BGRA_ppm(&(ovr_sldo->framebuffer[0]));
@@ -166,10 +194,12 @@ void print_screen_info(xcb_context_t *xcb_context){
 
 ovr_sldo_context_t *init(){
   //Set up out main context
-  ovr_sldo_context_t *ovr_sldo = malloc(sizeof (ovr_sldo_context_t));
+  //ovr_sldo_context_t *ovr_sldo = malloc(sizeof (ovr_sldo_context_t));
+  ovr_sldo = malloc(sizeof (ovr_sldo_context_t));
 
   //Set up xcb context
   ovr_sldo->xcb_context = malloc(sizeof (xcb_context_t));
+  xcb_context=ovr_sldo->xcb_context;
   ovr_sldo->xcb_context->connection = xcb_connect(NULL, &ovr_sldo->xcb_context->screen_number);
   xcb_errors_context_new(ovr_sldo->xcb_context->connection, &(ovr_sldo->xcb_context->errors_context));
 
@@ -179,7 +209,7 @@ ovr_sldo_context_t *init(){
   //Initialise the framebuffer struct
   ovr_sldo->framebuffer = calloc(1, sizeof (shm_framebuffer_t));
   //We have 3 framebuffers, so that if we finish writing to a fresh framebuffer but another thread is reading from an old one, we can write to a third framebuffer so that when this reading is done, the other thread can immediately read the fresh one we just wrote instead of waiting for us to write it again
-  ovr_sldo->framebuffer[0].number_of_buffers = 3;
+  ovr_sldo->framebuffer[0].number_of_buffers = 6;
 
   //Also initialise out single pointer to an array of shm segments (for framebuffer[0]->data
   ovr_sldo->xcb_context->shm_segment = calloc((size_t) ovr_sldo->number_of_buffers,

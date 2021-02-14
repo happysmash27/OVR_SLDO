@@ -1,2 +1,2 @@
 all: desktopview.c
-	gcc -Wall desktopview.c -lxcb -lxcb-shm -lxcb-errors -o desktopview 
+	gcc -Wall desktopview.c -lpthread -lxcb -lxcb-shm -lxcb-errors -o desktopview 

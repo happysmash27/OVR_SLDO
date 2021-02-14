@@ -29,7 +29,13 @@ typedef struct xcb_context_t {
 
 typedef struct ovr_sldo_context_t {
   xcb_context_t *xcb_context;
+  size_t num_threads;
+  pthread_t *threads;
   //Here we have the number of buffers we have for different windows
   unsigned int number_of_buffers;
   shm_framebuffer_t *framebuffer;
 } ovr_sldo_context_t;
+
+ovr_sldo_context_t *ovr_sldo;
+
+xcb_context_t *xcb_context;
