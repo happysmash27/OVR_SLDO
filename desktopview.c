@@ -128,7 +128,7 @@ int main (int argc, char **argv){
   clock_gettime(CLOCK_REALTIME, &start_time);
 
   //Create threads to write our framebuffer twice, to see if our problem is speed or latency
-  ovr_sldo->num_threads = 60;
+  ovr_sldo->num_threads = 120;
   ovr_sldo->threads = calloc(ovr_sldo->num_threads, sizeof(pthread_t));
   
   //Capture ovr_sldo->num_threads frames for our speed vs latency testing
@@ -140,7 +140,7 @@ int main (int argc, char **argv){
       exit_code = EXIT_FAILURE;
     }
     //Wait 16 ms for next frame
-    usleep(16*1000);
+    usleep(1000000/60);
   }
 
   //Wait for our last thread to exit
