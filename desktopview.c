@@ -128,7 +128,7 @@ int main (int argc, char **argv){
   clock_gettime(CLOCK_REALTIME, &start_time);
 
   //Create threads to write our framebuffer twice, to see if our problem is speed or latency
-  ovr_sldo->num_threads = 120;
+  ovr_sldo->num_threads = 90;
   ovr_sldo->threads = calloc(ovr_sldo->num_threads, sizeof(pthread_t));
   
   //Capture ovr_sldo->num_threads frames for our speed vs latency testing
@@ -139,8 +139,8 @@ int main (int argc, char **argv){
       fprintf(stderr, "Error creating thread %d!\n", i);
       exit_code = EXIT_FAILURE;
     }
-    //Wait 16 ms for next frame
-    usleep(1000000/60);
+    //Wait for next frame
+    usleep(1000000/90);
   }
 
   //Wait for our last thread to exit
@@ -209,7 +209,7 @@ ovr_sldo_context_t *init(){
   //Initialise the framebuffer struct
   ovr_sldo->framebuffer = calloc(1, sizeof (shm_framebuffer_t));
   //We have 3 framebuffers, so that if we finish writing to a fresh framebuffer but another thread is reading from an old one, we can write to a third framebuffer so that when this reading is done, the other thread can immediately read the fresh one we just wrote instead of waiting for us to write it again
-  ovr_sldo->framebuffer[0].number_of_buffers = 6;
+  ovr_sldo->framebuffer[0].number_of_buffers = 9;
 
   //Also initialise out single pointer to an array of shm segments (for framebuffer[0]->data
   ovr_sldo->xcb_context->shm_segment = calloc((size_t) ovr_sldo->number_of_buffers,
